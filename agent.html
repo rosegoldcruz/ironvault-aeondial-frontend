@@ -100,8 +100,36 @@
   .notes-area:focus{border-color:var(--cyan)}
   #callback-section{display:none;margin-bottom:16px}
   .callback-label{font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-family:'IBM Plex Mono',monospace}
-  .datetime-input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px;font-size:14px;border-radius:4px;outline:none}
-  .datetime-input:focus{border-color:var(--cyan)}
+  .cb-display{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px 14px;font-size:14px;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;transition:border .2s}
+  .cb-display:hover{border-color:var(--cyan)}
+  .cb-display span{color:var(--muted)}
+  .cb-display.has-val span{color:var(--text)}
+
+  /* Calendar modal */
+  #cal-modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:200;padding:16px}
+  #cal-modal.open{display:flex}
+  .cal-box{background:#16161f;border:1px solid var(--border);border-radius:10px;padding:20px;width:100%;max-width:320px}
+  .cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .cal-header button{background:none;border:1px solid var(--border);color:var(--text);width:32px;height:32px;border-radius:4px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
+  .cal-header button:hover{border-color:var(--cyan);color:var(--cyan)}
+  .cal-month{font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--cyan);letter-spacing:1px}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:16px}
+  .cal-dow{text-align:center;font-size:10px;color:var(--muted);padding:4px 0;font-family:'IBM Plex Mono',monospace;text-transform:uppercase}
+  .cal-day{text-align:center;padding:7px 2px;border-radius:4px;cursor:pointer;font-size:13px;border:1px solid transparent;transition:all .15s}
+  .cal-day:hover:not(.empty):not(.disabled){border-color:var(--cyan);color:var(--cyan)}
+  .cal-day.empty{cursor:default}
+  .cal-day.disabled{color:#333;cursor:not-allowed}
+  .cal-day.selected{background:var(--cyan);color:#000;font-weight:700}
+  .cal-day.today{border-color:var(--cyan-dim)}
+  .cal-time{display:flex;align-items:center;gap:8px;margin-bottom:16px}
+  .cal-time select{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:4px;font-size:14px;outline:none;cursor:pointer}
+  .cal-time select:focus{border-color:var(--cyan)}
+  .cal-time-sep{color:var(--muted);font-size:18px;font-weight:bold}
+  .cal-time-label{font-size:11px;color:var(--muted);text-align:center;margin-bottom:4px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:1px}
+  .cal-confirm{width:100%;padding:11px;background:var(--cyan);color:#000;font-weight:700;font-size:14px;border:none;cursor:pointer;border-radius:4px;letter-spacing:1px}
+  .cal-confirm:hover{filter:brightness(1.1)}
+  .cal-cancel{width:100%;padding:9px;background:none;border:1px solid var(--border);color:var(--muted);font-size:13px;cursor:pointer;border-radius:4px;margin-top:6px}
+  .cal-cancel:hover{border-color:var(--red);color:var(--red)}
   .submit-btn{width:100%;padding:14px;background:var(--cyan);color:#000;font-weight:600;font-size:15px;border:none;cursor:pointer;border-radius:4px;letter-spacing:1px}
   .submit-btn:disabled{opacity:.5;cursor:not-allowed}
 
@@ -157,6 +185,27 @@
   <audio id="remote-media" autoplay playsinline></audio>
 </div>
 
+<!-- ── CALENDAR MODAL ───────────────────────────────────── -->
+<div id="cal-modal">
+  <div class="cal-box">
+    <div class="cal-header">
+      <button onclick="calNav(-1)">&#8249;</button>
+      <div class="cal-month" id="cal-month-label"></div>
+      <button onclick="calNav(1)">&#8250;</button>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+    <div class="cal-time-label">Time</div>
+    <div class="cal-time">
+      <select id="cal-hour"></select>
+      <span class="cal-time-sep">:</span>
+      <select id="cal-min"></select>
+      <select id="cal-ampm"><option>AM</option><option>PM</option></select>
+    </div>
+    <button class="cal-confirm" onclick="calConfirm()">CONFIRM</button>
+    <button class="cal-cancel" onclick="closeCalModal()">CANCEL</button>
+  </div>
+</div>
+
 <!-- ── WRAP-UP MODAL ──────────────────────────────────────── -->
 <div id="wrapup-modal">
   <div class="modal-box">
@@ -165,7 +214,10 @@
     <textarea class="notes-area" id="notes-input" placeholder="Notes (optional)..."></textarea>
     <div id="callback-section">
       <div class="callback-label">Callback Date & Time</div>
-      <input type="datetime-local" class="datetime-input" id="callback-dt">
+      <div class="cb-display" id="cb-display" onclick="openCalModal()">
+        <span id="cb-display-text">Pick a date & time...</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      </div>
     </div>
     <button class="submit-btn" id="submit-wrapup" onclick="submitWrapUp()">SUBMIT & GO READY</button>
   </div>
@@ -184,6 +236,96 @@ let callTimerInterval = null;
 let callStartTime = null;
 let selectedDisposition = null;
 let pollInterval = null;
+let calSelectedDate = null; // Date object for selected calendar day
+let calViewYear = null;
+let calViewMonth = null; // 0-indexed
+let calCallbackISO = null; // final ISO string set on confirm
+
+// ── CALENDAR ────────────────────────────────────────────────
+function openCalModal() {
+  const now = new Date();
+  calViewYear = now.getFullYear();
+  calViewMonth = now.getMonth();
+  if (!calSelectedDate) calSelectedDate = null;
+  buildCalGrid();
+  buildTimeSelects(now);
+  document.getElementById('cal-modal').classList.add('open');
+}
+function closeCalModal() {
+  document.getElementById('cal-modal').classList.remove('open');
+}
+function calNav(dir) {
+  calViewMonth += dir;
+  if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
+  if (calViewMonth < 0)  { calViewMonth = 11; calViewYear--; }
+  buildCalGrid();
+}
+function buildCalGrid() {
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-month-label').textContent = `${MONTHS[calViewMonth]} ${calViewYear}`;
+  const grid = document.getElementById('cal-grid');
+  grid.innerHTML = '';
+  ['Su','Mo','Tu','We','Th','Fr','Sa'].forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'cal-dow'; el.textContent = d;
+    grid.appendChild(el);
+  });
+  const today = new Date(); today.setHours(0,0,0,0);
+  const firstDay = new Date(calViewYear, calViewMonth, 1).getDay();
+  const daysInMonth = new Date(calViewYear, calViewMonth+1, 0).getDate();
+  for (let i = 0; i < firstDay; i++) {
+    const el = document.createElement('div'); el.className = 'cal-day empty'; grid.appendChild(el);
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const el = document.createElement('div');
+    el.className = 'cal-day'; el.textContent = d;
+    const thisDate = new Date(calViewYear, calViewMonth, d);
+    if (thisDate < today) { el.classList.add('disabled'); }
+    else {
+      if (thisDate.getTime() === today.getTime()) el.classList.add('today');
+      if (calSelectedDate && calSelectedDate.getFullYear()===calViewYear && calSelectedDate.getMonth()===calViewMonth && calSelectedDate.getDate()===d) el.classList.add('selected');
+      el.onclick = () => {
+        calSelectedDate = new Date(calViewYear, calViewMonth, d);
+        buildCalGrid();
+      };
+    }
+    grid.appendChild(el);
+  }
+}
+function buildTimeSelects(now) {
+  const hSel = document.getElementById('cal-hour');
+  const mSel = document.getElementById('cal-min');
+  const ampm = document.getElementById('cal-ampm');
+  hSel.innerHTML = ''; mSel.innerHTML = '';
+  for (let h = 1; h <= 12; h++) {
+    const o = document.createElement('option'); o.value = h; o.textContent = String(h).padStart(2,'0');
+    hSel.appendChild(o);
+  }
+  for (let m = 0; m < 60; m += 15) {
+    const o = document.createElement('option'); o.value = m; o.textContent = String(m).padStart(2,'0');
+    mSel.appendChild(o);
+  }
+  // Default to next hour
+  let h = now.getHours() + 1; if (h >= 24) h = 0;
+  ampm.value = h >= 12 ? 'PM' : 'AM';
+  hSel.value = h % 12 || 12;
+  mSel.value = 0;
+}
+function calConfirm() {
+  if (!calSelectedDate) { alert('Please select a date.'); return; }
+  const h = parseInt(document.getElementById('cal-hour').value);
+  const m = parseInt(document.getElementById('cal-min').value);
+  const ampm = document.getElementById('cal-ampm').value;
+  let hours24 = h % 12 + (ampm === 'PM' ? 12 : 0);
+  const dt = new Date(calSelectedDate);
+  dt.setHours(hours24, m, 0, 0);
+  calCallbackISO = dt.toISOString();
+  const display = dt.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+  const dispEl = document.getElementById('cb-display');
+  document.getElementById('cb-display-text').textContent = display;
+  dispEl.classList.add('has-val');
+  closeCalModal();
+}
 let holdAudioCtx = null;
 let holdOscillator = null;
 let holdGain = null;
@@ -507,11 +649,8 @@ async function submitWrapUp() {
   // Validate callback date before touching the button
   let callback_at = undefined;
   if (selectedDisposition === 'Callback') {
-    const dtVal = document.getElementById('callback-dt').value;
-    if (!dtVal) { alert('Please select a callback date & time.'); return; }
-    const dt = new Date(dtVal);
-    if (isNaN(dt.getTime())) { alert('Invalid callback date.'); return; }
-    callback_at = dt.toISOString();
+    if (!calCallbackISO) { alert('Please pick a callback date & time.'); return; }
+    callback_at = calCallbackISO;
   }
 
   const btn = document.getElementById('submit-wrapup');
@@ -527,6 +666,9 @@ async function submitWrapUp() {
     const res = await apiFetch(`/calls/${currentCallId}/wrapup`, 'POST', body);
     if (res.ok) {
       document.getElementById('wrapup-modal').classList.remove('open');
+      calCallbackISO = null; calSelectedDate = null;
+      document.getElementById('cb-display-text').textContent = 'Pick a date & time...';
+      document.getElementById('cb-display').classList.remove('has-val');
       currentCallId = null;
       document.getElementById('call-card').style.display = 'none';
       document.getElementById('call-timer').textContent = '00:00';

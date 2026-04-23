@@ -37,6 +37,7 @@
   /* ── LOGIN ── */
   #login-screen{width:100%;max-width:400px}
   .logo{font-family:'IBM Plex Mono',monospace;font-size:22px;color:var(--cyan);letter-spacing:4px;text-align:center;margin-bottom:8px}
+  .logo img{max-width:180px;height:auto;display:block;margin:0 auto 8px}
   .logo-sub{text-align:center;color:var(--muted);font-size:13px;margin-bottom:40px;letter-spacing:2px}
   .field{margin-bottom:16px}
   .field label{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;font-family:'IBM Plex Mono',monospace}
@@ -155,7 +156,10 @@
 
 <!-- ── LOGIN ────────────────────────────────────────────── -->
 <div id="login-screen">
-  <div class="logo">AEON DIAL</div>
+  <div class="logo">
+    <img src="/logo.png" alt="AEON DIAL" onerror="this.style.display='none';this.nextElementSibling.style.display='block'" />
+    <span style="display:none">AEON DIAL</span>
+  </div>
   <div class="logo-sub">AGENT PORTAL</div>
   <div class="field">
     <label>Username</label>
@@ -171,6 +175,9 @@
 
 <!-- ── AGENT PANEL ───────────────────────────────────────── -->
 <div id="agent-screen">
+  <div style="text-align:center;margin-bottom:12px">
+    <img src="/logo.png" alt="AEON DIAL" style="max-height:36px;width:auto" onerror="this.style.display='none'" />
+  </div>
   <div class="agent-info" id="agent-name-display">—</div>
 
   <div class="panel">

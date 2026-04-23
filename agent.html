@@ -240,6 +240,7 @@ let calSelectedDate = null; // Date object for selected calendar day
 let calViewYear = null;
 let calViewMonth = null; // 0-indexed
 let calCallbackISO = null; // final ISO string set on confirm
+let hasBeeped = false;
 
 // ── CALENDAR ────────────────────────────────────────────────
 function openCalModal() {
@@ -458,6 +459,7 @@ async function initWebRTC() {
         if (['hangup', 'destroy', 'purge'].includes(call.state)) {
           activeTelnyxCall = null;
           stopHoldTone();
+          hasBeeped = false;
           console.log('[WebRTC] Call ended');
         }
       });
@@ -527,7 +529,7 @@ function startSessionPoll() {
         }
       }
     } catch(e) { /* silent */ }
-  }, 2000);
+  }, 500);
 }
 
 async function fetchCurrentCall() {
@@ -562,6 +564,10 @@ async function fetchCurrentCall() {
     if ((call.answered_at || call.status === 'bridged') && !callTimerInterval) {
       callStartTime = new Date(call.answered_at ?? call.started_at);
       startCallTimer();
+    }
+    if (call.status === 'bridged' && !hasBeeped) {
+      hasBeeped = true;
+      playBridgeBeep();
     }
   } catch (e) {
     console.warn('fetchCurrentCall failed:', e);

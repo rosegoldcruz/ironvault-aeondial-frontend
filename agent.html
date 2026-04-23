@@ -415,8 +415,15 @@ async function initWebRTC() {
         document.getElementById('ready-btn').disabled = false;
       })
       .on('telnyx.error', (err) => {
-        updateSipStatus('red', 'WebRTC Error: ' + (err?.message ?? 'Unknown'));
-        console.error('WebRTC Error:', err);
+        console.warn('[WebRTC] Non-fatal error:', err);
+        setTimeout(async () => {
+          if (telnyxClient && telnyxClient.connected) {
+            updateSipStatus('green', 'REGISTERED');
+          } else {
+            updateSipStatus('red', 'WebRTC Error — reconnecting...');
+            try { telnyxClient.connect(); } catch(e) {}
+          }
+        }, 2000);
       })
       .on('telnyx.notification', async (notification) => {
         const call = notification?.call;

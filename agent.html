@@ -504,15 +504,23 @@ function selectDisposition(d) {
 async function submitWrapUp() {
   if (!selectedDisposition || !currentCallId) return;
 
+  // Validate callback date before touching the button
+  let callback_at = undefined;
+  if (selectedDisposition === 'Callback') {
+    const dtVal = document.getElementById('callback-dt').value;
+    if (!dtVal) { alert('Please select a callback date & time.'); return; }
+    const dt = new Date(dtVal);
+    if (isNaN(dt.getTime())) { alert('Invalid callback date.'); return; }
+    callback_at = dt.toISOString();
+  }
+
   const btn = document.getElementById('submit-wrapup');
   btn.disabled = true; btn.textContent = 'SAVING...';
 
   const body = {
     disposition: selectedDisposition,
     notes: document.getElementById('notes-input').value.trim() || undefined,
-    callback_at: selectedDisposition === 'Callback'
-      ? new Date(document.getElementById('callback-dt').value).toISOString()
-      : undefined,
+    callback_at,
   };
 
   try {
@@ -526,8 +534,14 @@ async function submitWrapUp() {
       document.getElementById('ready-btn').className = 'go-pause';
       document.getElementById('ready-btn').textContent = 'PAUSE';
       document.getElementById('ready-btn').disabled = false;
+    } else {
+      const errData = await res.json().catch(() => ({}));
+      console.error('[WRAPUP] Server error:', res.status, errData);
+      btn.disabled = false; btn.textContent = 'SUBMIT & GO READY';
+      alert(`Save failed (${res.status}): ${errData.error || 'Unknown error'}`);
     }
   } catch(e) {
+    console.error('[WRAPUP] Fetch error:', e);
     btn.disabled = false; btn.textContent = 'SUBMIT & GO READY';
   }
 }

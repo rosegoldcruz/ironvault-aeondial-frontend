@@ -559,7 +559,7 @@ async function fetchCurrentCall() {
     const sub = statusMap[call.status] ?? call.status;
     document.getElementById('state-sub').textContent = sub;
 
-    if (call.answered_at || call.status === 'bridged') {
+    if ((call.answered_at || call.status === 'bridged') && !callTimerInterval) {
       callStartTime = new Date(call.answered_at ?? call.started_at);
       startCallTimer();
     }
@@ -568,9 +568,25 @@ async function fetchCurrentCall() {
   }
 }
 
+// ── BRIDGE BEEP ──────────────────────────────────────────
+function playBridgeBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sine'; osc.frequency.setValueAtTime(880, ctx.currentTime);
+    gain.gain.setValueAtTime(0.4, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.18);
+    osc.onended = () => ctx.close();
+  } catch(e) {}
+}
+
 // ── CALL TIMER ───────────────────────────────────────────
 function startCallTimer() {
   stopCallTimer();
+  playBridgeBeep();
   callTimerInterval = setInterval(() => {
     const secs = Math.floor((Date.now() - callStartTime.getTime()) / 1000);
     const m = String(Math.floor(secs / 60)).padStart(2,'0');

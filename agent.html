@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AEON DIAL — Agent</title>
+<script src="https://cdn.jsdelivr.net/npm/@telnyx/webrtc/lib/bundle.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0a0a0f;
+    --surface:#111118;
+    --border:#1e1e2e;
+    --cyan:#22d3ee;
+    --cyan-dim:#0e7490;
+    --red:#ef4444;
+    --green:#22c55e;
+    --yellow:#eab308;
+    --text:#e2e8f0;
+    --muted:#64748b;
+  }
+
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Sans',sans-serif;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+  }
+
+  /* ── LOGIN ── */
+  #login-screen{width:100%;max-width:400px}
+  .logo{font-family:'IBM Plex Mono',monospace;font-size:22px;color:var(--cyan);letter-spacing:4px;text-align:center;margin-bottom:8px}
+  .logo-sub{text-align:center;color:var(--muted);font-size:13px;margin-bottom:40px;letter-spacing:2px}
+  .field{margin-bottom:16px}
+  .field label{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;font-family:'IBM Plex Mono',monospace}
+  .field input{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:12px 16px;font-size:15px;font-family:'IBM Plex Sans',sans-serif;outline:none;border-radius:4px;transition:border .2s}
+  .field input:focus{border-color:var(--cyan)}
+  .btn{width:100%;padding:14px;background:var(--cyan);color:#000;font-weight:600;font-size:15px;border:none;cursor:pointer;border-radius:4px;transition:background .2s;letter-spacing:1px}
+  .btn:hover{background:var(--cyan-dim);color:#fff}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .error-msg{color:var(--red);font-size:13px;text-align:center;margin-top:12px}
+
+  /* ── AGENT PANEL ── */
+  #agent-screen{width:100%;max-width:520px;display:none}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:24px;margin-bottom:16px}
+  .panel-title{font-family:'IBM Plex Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:16px}
+
+  .status-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .dot.green{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .dot.cyan{background:var(--cyan);box-shadow:0 0 8px var(--cyan);animation:pulse 1.5s infinite}
+  .dot.yellow{background:var(--yellow);box-shadow:0 0 8px var(--yellow)}
+  .dot.red{background:var(--red)}
+  .dot.gray{background:var(--muted)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  .state-label{font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:600;color:var(--text)}
+  .state-sub{font-size:13px;color:var(--muted);margin-top:4px}
+
+  /* READY/PAUSE BUTTON */
+  #ready-btn{
+    width:100%;padding:16px;font-size:16px;font-weight:600;
+    border:none;cursor:pointer;border-radius:6px;letter-spacing:1px;
+    transition:all .2s;font-family:'IBM Plex Sans',sans-serif;margin-top:16px
+  }
+  #ready-btn.go-ready{background:var(--green);color:#000}
+  #ready-btn.go-ready:hover{filter:brightness(1.1)}
+  #ready-btn.go-pause{background:var(--yellow);color:#000}
+  #ready-btn.go-pause:hover{filter:brightness(1.1)}
+  #ready-btn:disabled{opacity:.4;cursor:not-allowed}
+
+  /* LIVE CALL CARD */
+  #call-card{display:none}
+  .lead-name{font-size:26px;font-weight:600;margin-bottom:4px}
+  .lead-location{font-size:14px;color:var(--muted);margin-bottom:16px}
+  .timer{font-family:'IBM Plex Mono',monospace;font-size:32px;color:var(--cyan);margin-bottom:16px}
+  .hangup-btn{width:100%;padding:14px;background:var(--red);color:#fff;font-size:15px;font-weight:600;border:none;cursor:pointer;border-radius:6px;letter-spacing:1px}
+  .hangup-btn:hover{filter:brightness(1.1)}
+
+  /* WRAP-UP MODAL */
+  #wrapup-modal{
+    position:fixed;inset:0;background:rgba(0,0,0,.85);
+    display:none;align-items:center;justify-content:center;z-index:100;padding:24px
+  }
+  #wrapup-modal.open{display:flex}
+  .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:28px;width:100%;max-width:460px}
+  .modal-title{font-family:'IBM Plex Mono',monospace;font-size:13px;text-transform:uppercase;letter-spacing:2px;color:var(--cyan);margin-bottom:20px}
+  .disp-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+  .disp-btn{padding:10px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;border-radius:4px;transition:all .15s;font-family:'IBM Plex Sans',sans-serif}
+  .disp-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+  .disp-btn.selected{background:var(--cyan);color:#000;border-color:var(--cyan);font-weight:600}
+  .notes-area{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:12px;font-size:14px;border-radius:4px;resize:vertical;min-height:80px;font-family:'IBM Plex Sans',sans-serif;outline:none;margin-bottom:16px}
+  .notes-area:focus{border-color:var(--cyan)}
+  #callback-section{display:none;margin-bottom:16px}
+  .callback-label{font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-family:'IBM Plex Mono',monospace}
+  .datetime-input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px;font-size:14px;border-radius:4px;outline:none}
+  .datetime-input:focus{border-color:var(--cyan)}
+  .submit-btn{width:100%;padding:14px;background:var(--cyan);color:#000;font-weight:600;font-size:15px;border:none;cursor:pointer;border-radius:4px;letter-spacing:1px}
+  .submit-btn:disabled{opacity:.5;cursor:not-allowed}
+
+  .agent-info{font-size:13px;color:var(--muted);text-align:right;margin-bottom:12px;font-family:'IBM Plex Mono',monospace}
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ────────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="logo">AEON DIAL</div>
+  <div class="logo-sub">AGENT PORTAL</div>
+  <div class="field">
+    <label>Username</label>
+    <input type="text" id="username-input" placeholder="daniel" autocomplete="username">
+  </div>
+  <div class="field">
+    <label>Password</label>
+    <input type="password" id="pass-input" placeholder="••••••••" autocomplete="current-password">
+  </div>
+  <button class="btn" id="login-btn" onclick="handleLogin()">LOGIN</button>
+  <div class="error-msg" id="login-error"></div>
+</div>
+
+<!-- ── AGENT PANEL ───────────────────────────────────────── -->
+<div id="agent-screen">
+  <div class="agent-info" id="agent-name-display">—</div>
+
+  <div class="panel">
+    <div class="panel-title">Connection Status</div>
+    <div class="status-row">
+      <div class="dot gray" id="sip-dot"></div>
+      <span id="sip-status">Initializing WebRTC...</span>
+    </div>
+    <div class="status-row">
+      <div class="dot gray" id="state-dot"></div>
+      <div>
+        <div class="state-label" id="state-label">OFFLINE</div>
+        <div class="state-sub" id="state-sub">Log in to begin</div>
+      </div>
+    </div>
+    <button id="ready-btn" class="go-ready" onclick="toggleReady()" disabled>GO READY</button>
+  </div>
+
+  <!-- Live Call Card -->
+  <div class="panel" id="call-card">
+    <div class="panel-title">Live Call</div>
+    <div class="lead-name" id="lead-name">Unknown Caller</div>
+    <div class="lead-location" id="lead-location">—</div>
+    <div class="timer" id="call-timer">00:00</div>
+    <button class="hangup-btn" onclick="hangupCurrentCall()">END CALL</button>
+  </div>
+  <audio id="remote-media" autoplay playsinline></audio>
+</div>
+
+<!-- ── WRAP-UP MODAL ──────────────────────────────────────── -->
+<div id="wrapup-modal">
+  <div class="modal-box">
+    <div class="modal-title">Wrap Up — Select Disposition</div>
+    <div class="disp-grid" id="disp-grid"></div>
+    <textarea class="notes-area" id="notes-input" placeholder="Notes (optional)..."></textarea>
+    <div id="callback-section">
+      <div class="callback-label">Callback Date & Time</div>
+      <input type="datetime-local" class="datetime-input" id="callback-dt">
+    </div>
+    <button class="submit-btn" id="submit-wrapup" onclick="submitWrapUp()">SUBMIT & GO READY</button>
+  </div>
+</div>
+
+<script>
+const API = 'https://api.aeondial.com';
+const DISPOSITIONS = ['Interested','Not Interested','Callback','Do Not Call','No Answer','Voicemail','Wrong Number','Other'];
+
+let token = null;
+let agentData = null;
+let telnyxClient = null;
+let activeTelnyxCall = null;
+let currentCallId = null;
+let callTimerInterval = null;
+let callStartTime = null;
+let selectedDisposition = null;
+let pollInterval = null;
+let holdAudioCtx = null;
+let holdOscillator = null;
+let holdGain = null;
+
+  // ── LOGIN ────────────────────────────────────────────────
+  async function handleLogin() {
+  const username = document.getElementById('username-input').value.trim();
+  const pass = document.getElementById('pass-input').value;
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('login-error');
+
+  if (!username || !pass) { err.textContent = 'Username and password required'; return; }
+
+  btn.disabled = true; btn.textContent = 'LOGGING IN...';
+  err.textContent = '';
+
+  try {
+    const res = await fetch(`${API}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password: pass }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) { err.textContent = data.error ?? 'Login failed'; btn.disabled = false; btn.textContent = 'LOGIN'; return; }
+
+    token = data.token;
+    agentData = data.agent;
+    document.getElementById('agent-name-display').textContent = agentData.name;
+
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('agent-screen').style.display = 'block';
+
+    await initWebRTC();
+    startSessionPoll();
+  } catch(e) {
+    err.textContent = 'Connection error'; btn.disabled = false; btn.textContent = 'LOGIN';
+  }
+}
+
+// ── WEBRTC INIT ─────────────────────────────────────────
+async function initWebRTC() {
+  updateSipStatus('gray', 'Fetching WebRTC credentials...');
+
+  try {
+    const res = await apiFetch('/session/webrtc-token');
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error ?? 'Failed to fetch SIP credentials');
+    }
+
+    const { sip_username, sip_password } = data;
+    if (!sip_username || !sip_password) {
+      throw new Error('Missing SIP credentials from backend');
+    }
+
+    const TelnyxDevice = window.TelnyxWebRTC?.TelnyxRTC;
+    if (!TelnyxDevice) {
+      throw new Error('Telnyx WebRTC SDK not loaded');
+    }
+
+    if (telnyxClient) {
+      try { telnyxClient.disconnect(); } catch {}
+    }
+
+    telnyxClient = new TelnyxDevice({
+      login: sip_username,
+      password: sip_password,
+      ringtoneFile: null,
+      ringbackFile: null,
+      enableBusyTone: false,
+      debug: false,
+      useMic: true,
+      useSpeaker: true,
+      remoteElement: 'remote-media',
+      codecPreferences: ['OPUS', 'PCMU', 'PCMA'],
+    });
+    telnyxClient.remoteElement = 'remote-media';
+
+    telnyxClient
+      .on('telnyx.ready', async () => {
+        updateSipStatus('green', 'REGISTERED');
+        await apiFetch('/session/register', 'POST');
+        updateState('REGISTERED', 'Click GO READY to start receiving calls');
+        document.getElementById('ready-btn').disabled = false;
+      })
+      .on('telnyx.error', (err) => {
+        updateSipStatus('red', 'WebRTC Error: ' + (err?.message ?? 'Unknown'));
+        console.error('WebRTC Error:', err);
+      })
+      .on('telnyx.notification', async (notification) => {
+        const call = notification?.call;
+
+        if (notification?.type !== 'callUpdate' || !call) {
+          return;
+        }
+
+        activeTelnyxCall = call;
+
+        if (call.state === 'ringing') {
+          console.log('[WebRTC] Incoming call from dialer');
+          updateState('RESERVED', 'Dialing lead...');
+          document.getElementById('lead-name').textContent = 'Dialing lead...';
+          document.getElementById('lead-location').textContent = 'Waiting for lead to pick up';
+          document.getElementById('call-card').style.display = 'block';
+          call.answer();
+          // Fetch lead info immediately so agent sees who is being dialed
+          fetchCurrentCall();
+          return;
+        }
+
+        if (['answering', 'early'].includes(call.state)) {
+          updateState('RESERVED', 'Dialing lead...');
+          document.getElementById('call-card').style.display = 'block';
+          // Start a quiet hold tone so agent knows they're on the line
+          startHoldTone();
+          fetchCurrentCall();
+          return;
+        }
+
+        if (call.state === 'active') {
+          console.log('[WebRTC] Call active - bridged');
+          stopHoldTone();
+          updateState('IN_CALL', 'Live call in progress');
+          await fetchCurrentCall();
+          return;
+        }
+
+        if (['hangup', 'destroy', 'purge'].includes(call.state)) {
+          activeTelnyxCall = null;
+          stopHoldTone();
+          console.log('[WebRTC] Call ended');
+        }
+      });
+
+    try { telnyxClient.enableMicrophone(); } catch (err) { console.warn('Microphone enable failed:', err); }
+    updateSipStatus('cyan', 'Connecting to Telnyx...');
+    telnyxClient.connect();
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(stream => console.log('[WebRTC] Mic access granted'))
+      .catch(err => console.error('[WebRTC] Mic access denied:', err));
+  } catch(e) {
+    updateSipStatus('red', 'Failed to initialize WebRTC');
+    console.error('WebRTC Init Error:', e);
+  }
+}
+
+// ── READY / PAUSE ────────────────────────────────────────
+async function toggleReady() {
+  const btn = document.getElementById('ready-btn');
+  const currentState = document.getElementById('state-label').textContent;
+
+  btn.disabled = true;
+
+  if (['REGISTERED','WRAP_UP','PAUSED'].includes(currentState)) {
+    const res = await apiFetch('/session/ready', 'POST');
+    if (res.ok) {
+      updateState('READY', 'Waiting for next live answer...');
+      btn.className = 'go-pause'; btn.textContent = 'PAUSE';
+    }
+  } else if (currentState === 'READY') {
+    const res = await apiFetch('/session/pause', 'POST');
+    if (res.ok) {
+      updateState('PAUSED', 'Paused — calls will not be routed to you');
+      btn.className = 'go-ready'; btn.textContent = 'GO READY';
+    }
+  }
+
+  btn.disabled = false;
+}
+
+// ── SESSION POLL ─────────────────────────────────────────
+function startSessionPoll() {
+  pollInterval = setInterval(async () => {
+    try {
+      const res = await apiFetch('/session/me');
+      const { session } = await res.json();
+      if (!session) return;
+
+      const state = session.state;
+      syncStateUI(state);
+
+      // If bridged or reserved, fetch call info
+      if ((state === 'IN_CALL' || state === 'RESERVED') && !currentCallId) {
+        await fetchCurrentCall();
+      }
+
+      // If WRAP_UP, show modal (and hydrate currentCallId from server if needed)
+      if (state === 'WRAP_UP') {
+        stopHoldTone();
+        if (!currentCallId) {
+          await fetchCurrentCall();
+        }
+        if (!document.getElementById('wrapup-modal').classList.contains('open')) {
+          stopCallTimer();
+          document.getElementById('call-card').style.display = 'none';
+          openWrapUp();
+        }
+      }
+    } catch(e) { /* silent */ }
+  }, 2000);
+}
+
+async function fetchCurrentCall() {
+  try {
+    const res = await apiFetch('/calls/current');
+    const { call } = await res.json();
+    if (!call) return;
+
+    currentCallId = call.id;
+    const lead = call.leads;
+    const fullName = [lead?.first_name, lead?.last_name].filter(Boolean).join(' ');
+    const location = [lead?.city, lead?.state].filter(Boolean).join(', ');
+
+    document.getElementById('lead-name').textContent = fullName || lead?.phone || 'Unknown';
+    document.getElementById('lead-location').textContent = location || lead?.phone || '—';
+    document.getElementById('call-card').style.display = 'block';
+
+    // Status sub-label based on call status
+    const statusMap = {
+      created: 'Preparing call...',
+      agent_dialing: 'Connecting you...',
+      agent_answered: 'Dialing lead...',
+      lead_dialing: 'Dialing lead...',
+      lead_answered: 'Live human! Connecting...',
+      dialing: 'Dialing lead...',
+      agent_reserved: 'Connecting you...',
+      bridged: 'Live call in progress',
+    };
+    const sub = statusMap[call.status] ?? call.status;
+    document.getElementById('state-sub').textContent = sub;
+
+    if (call.answered_at || call.status === 'bridged') {
+      callStartTime = new Date(call.answered_at ?? call.started_at);
+      startCallTimer();
+    }
+  } catch (e) {
+    console.warn('fetchCurrentCall failed:', e);
+  }
+}
+
+// ── CALL TIMER ───────────────────────────────────────────
+function startCallTimer() {
+  stopCallTimer();
+  callTimerInterval = setInterval(() => {
+    const secs = Math.floor((Date.now() - callStartTime.getTime()) / 1000);
+    const m = String(Math.floor(secs / 60)).padStart(2,'0');
+    const s = String(secs % 60).padStart(2,'0');
+    document.getElementById('call-timer').textContent = `${m}:${s}`;
+  }, 1000);
+}
+
+function stopCallTimer() {
+  if (callTimerInterval) { clearInterval(callTimerInterval); callTimerInterval = null; }
+}
+
+// ── HANG UP ──────────────────────────────────────────────
+async function hangupCurrentCall() {
+  console.log('[END CALL] clicked, currentCallId=', currentCallId, 'activeTelnyxCall=', !!activeTelnyxCall);
+  const btn = document.querySelector('.hangup-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'ENDING...'; }
+
+  // 1) Hang up local WebRTC leg if we still have one
+  if (activeTelnyxCall) {
+    try { activeTelnyxCall.hangup(); } catch(e) { console.warn('Local hangup failed:', e); }
+    activeTelnyxCall = null;
+  }
+
+  // 2) Always tell the backend to hang up both legs via Telnyx (handles
+  //    the case where WebRTC session is stale or call object was cleared)
+  if (currentCallId) {
+    try {
+      await apiFetch(`/calls/${currentCallId}/hangup`, 'POST');
+    } catch (e) {
+      console.warn('Backend hangup failed:', e);
+    }
+  }
+
+  // 3) Clear UI immediately so user isn't stuck looking at a dead card
+  stopHoldTone();
+  stopCallTimer();
+  document.getElementById('call-card').style.display = 'none';
+  document.getElementById('call-timer').textContent = '00:00';
+  if (btn) { btn.disabled = false; btn.textContent = 'END CALL'; }
+}
+
+// ── WRAP-UP ──────────────────────────────────────────────
+function openWrapUp() {
+  selectedDisposition = null;
+  document.getElementById('notes-input').value = '';
+  document.getElementById('callback-section').style.display = 'none';
+  document.getElementById('submit-wrapup').disabled = true;
+
+  // Build disposition buttons
+  const grid = document.getElementById('disp-grid');
+  grid.innerHTML = '';
+  DISPOSITIONS.forEach(d => {
+    const btn = document.createElement('button');
+    btn.className = 'disp-btn';
+    btn.textContent = d;
+    btn.onclick = () => selectDisposition(d);
+    grid.appendChild(btn);
+  });
+
+  document.getElementById('wrapup-modal').classList.add('open');
+}
+
+function selectDisposition(d) {
+  selectedDisposition = d;
+  document.querySelectorAll('.disp-btn').forEach(b => {
+    b.classList.toggle('selected', b.textContent === d);
+  });
+  document.getElementById('callback-section').style.display = d === 'Callback' ? 'block' : 'none';
+  document.getElementById('submit-wrapup').disabled = false;
+}
+
+async function submitWrapUp() {
+  if (!selectedDisposition || !currentCallId) return;
+
+  const btn = document.getElementById('submit-wrapup');
+  btn.disabled = true; btn.textContent = 'SAVING...';
+
+  const body = {
+    disposition: selectedDisposition,
+    notes: document.getElementById('notes-input').value.trim() || undefined,
+    callback_at: selectedDisposition === 'Callback'
+      ? new Date(document.getElementById('callback-dt').value).toISOString()
+      : undefined,
+  };
+
+  try {
+    const res = await apiFetch(`/calls/${currentCallId}/wrapup`, 'POST', body);
+    if (res.ok) {
+      document.getElementById('wrapup-modal').classList.remove('open');
+      currentCallId = null;
+      document.getElementById('call-card').style.display = 'none';
+      document.getElementById('call-timer').textContent = '00:00';
+      updateState('READY', 'Waiting for next live answer...');
+      document.getElementById('ready-btn').className = 'go-pause';
+      document.getElementById('ready-btn').textContent = 'PAUSE';
+      document.getElementById('ready-btn').disabled = false;
+    }
+  } catch(e) {
+    btn.disabled = false; btn.textContent = 'SUBMIT & GO READY';
+  }
+}
+
+// ── UI HELPERS ────────────────────────────────────────────
+function syncStateUI(state) {
+  updateState(state, stateSubtext(state));
+  const btn = document.getElementById('ready-btn');
+  if (state === 'READY') {
+    btn.className = 'go-pause'; btn.textContent = 'PAUSE'; btn.disabled = false;
+  } else if (['REGISTERED','PAUSED','WRAP_UP'].includes(state)) {
+    btn.className = 'go-ready'; btn.textContent = 'GO READY'; btn.disabled = false;
+  } else {
+    btn.disabled = true;
+  }
+
+  // Hide the Live Call card whenever we're not in a call-related state.
+  // This prevents stale cards (like an aborted call) from lingering.
+  const callStates = ['RESERVED', 'IN_CALL', 'WRAP_UP'];
+  if (!callStates.includes(state)) {
+    stopHoldTone();
+    stopCallTimer();
+    if (currentCallId) {
+      currentCallId = null;
+      document.getElementById('call-card').style.display = 'none';
+      document.getElementById('call-timer').textContent = '00:00';
+    }
+  }
+}
+
+function stateSubtext(s) {
+  const map = {
+    OFFLINE:'Not connected',REGISTERING:'Connecting...',REGISTERED:'Click GO READY to start',
+    READY:'Waiting for next live answer...',RESERVED:'Connecting call...',
+    IN_CALL:'Live call in progress',WRAP_UP:'Complete wrap-up to continue',
+    PAUSED:'Paused — not receiving calls',ERROR:'Error — refresh page',
+  };
+  return map[s] ?? s;
+}
+
+function updateState(state, sub) {
+  document.getElementById('state-label').textContent = state;
+  document.getElementById('state-sub').textContent = sub;
+  const colors = {
+    READY:'cyan',IN_CALL:'green',RESERVED:'yellow',WRAP_UP:'yellow',
+    REGISTERED:'green',PAUSED:'gray',ERROR:'red',OFFLINE:'gray',
+  };
+  const dot = document.getElementById('state-dot');
+  dot.className = 'dot ' + (colors[state] ?? 'gray');
+}
+
+function updateSipStatus(color, text) {
+  document.getElementById('sip-dot').className = 'dot ' + color;
+  document.getElementById('sip-status').textContent = text;
+}
+
+// ── HOLD TONE (Web Audio API, no external files) ──────────
+function startHoldTone() {
+  try {
+    if (holdAudioCtx) return;
+    holdAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    holdOscillator = holdAudioCtx.createOscillator();
+    holdGain = holdAudioCtx.createGain();
+    holdOscillator.type = 'sine';
+    holdOscillator.frequency.value = 440; // A4 dial tone
+    holdGain.gain.value = 0.05; // quiet
+    holdOscillator.connect(holdGain);
+    holdGain.connect(holdAudioCtx.destination);
+    holdOscillator.start();
+    // Pulse on/off every 500ms like a dial tone
+    const lfo = holdAudioCtx.createOscillator();
+    const lfoGain = holdAudioCtx.createGain();
+    lfo.frequency.value = 1; // 1 Hz pulse
+    lfo.connect(lfoGain);
+    lfoGain.gain.value = 0.05;
+    lfoGain.connect(holdGain.gain);
+    lfo.start();
+  } catch (e) {
+    console.warn('Hold tone failed:', e);
+  }
+}
+
+function stopHoldTone() {
+  try {
+    if (holdOscillator) { holdOscillator.stop(); holdOscillator.disconnect(); holdOscillator = null; }
+    if (holdGain) { holdGain.disconnect(); holdGain = null; }
+    if (holdAudioCtx) { holdAudioCtx.close(); holdAudioCtx = null; }
+  } catch (e) { /* ignore */ }
+}
+
+function apiFetch(path, method = 'GET', body = null) {
+  const opts = {
+    method,
+    headers: body 
+      ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+      : { 'Authorization': `Bearer ${token}` },
+  };
+  if (body) opts.body = JSON.stringify(body);
+  return fetch(API + path, opts);
+}
+
+// Enter key on password
+document.getElementById('pass-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') handleLogin();
+});
+</script>
+</body>
+</html>

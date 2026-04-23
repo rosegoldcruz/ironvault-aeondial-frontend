@@ -37,6 +37,9 @@
   /* ── LOGIN ── */
   #login-screen{width:100%;max-width:400px}
   .logo{font-family:'IBM Plex Mono',monospace;font-size:22px;color:var(--cyan);letter-spacing:4px;text-align:center;margin-bottom:8px}
+  .logo-wrap{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px}
+  .logo-wrap .emblem{max-width:160px;height:auto}
+  .logo-wrap .fox{max-height:54px;width:auto;filter:drop-shadow(0 0 6px rgba(0,200,255,0.4))}
   .logo img{max-width:180px;height:auto;display:block;margin:0 auto 8px}
   .logo-sub{text-align:center;color:var(--muted);font-size:13px;margin-bottom:40px;letter-spacing:2px}
   .field{margin-bottom:16px}
@@ -157,8 +160,10 @@
 <!-- ── LOGIN ────────────────────────────────────────────── -->
 <div id="login-screen">
   <div class="logo">
-    <img src="/logo.png" alt="AEON DIAL" onerror="this.style.display='none';this.nextElementSibling.style.display='block'" />
-    <span style="display:none">AEON DIAL</span>
+    <div class="logo-wrap">
+      <img class="emblem" src="/logo.png" alt="AEON DIAL" onerror="this.style.display='none'" />
+      <img class="fox" src="/logo-fox.png" alt="" onerror="this.style.display='none'" />
+    </div>
   </div>
   <div class="logo-sub">AGENT PORTAL</div>
   <div class="field">
@@ -175,8 +180,9 @@
 
 <!-- ── AGENT PANEL ───────────────────────────────────────── -->
 <div id="agent-screen">
-  <div style="text-align:center;margin-bottom:12px">
-    <img src="/logo.png" alt="AEON DIAL" style="max-height:36px;width:auto" onerror="this.style.display='none'" />
+  <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px">
+    <img src="/logo.png" alt="AEON DIAL" style="max-height:32px;width:auto" onerror="this.style.display='none'" />
+    <img src="/logo-fox.png" alt="" style="max-height:40px;width:auto;filter:drop-shadow(0 0 5px rgba(0,200,255,0.4))" onerror="this.style.display='none'" />
   </div>
   <div class="agent-info" id="agent-name-display">—</div>
 
@@ -889,6 +895,124 @@ function apiFetch(path, method = 'GET', body = null) {
 document.getElementById('pass-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') handleLogin();
 });
+
+// ── ALIEN ANIMATED CURSORS ──────────────────────────────
+(async () => {
+  try {
+    const res = await fetch('/cursors/manifest.json');
+    if (!res.ok) return;
+    const manifest = await res.json();
+
+    const cursorMap = {
+      'default':   'NormalSelect',
+      'pointer':   'LinkSelect',
+      'wait':      'Busy',
+      'progress':  'WorkingInBackground',
+      'text':      'TextSelect',
+      'move':      'Move',
+      'crosshair': 'PrecisionSelect',
+      'not-allowed': 'Unavailable',
+      'help':      'HelpSelect',
+      'ew-resize': 'HorizontalResize',
+      'ns-resize': 'VerticalResize',
+      'nwse-resize':'DiagonalResize1',
+      'nesw-resize':'DiagonalResize2',
+    };
+
+    // Pre-build CSS data URLs for each cursor type
+    const cursorFrames = {}; // name -> [{url, ms}]
+
+    async function loadFrames(name) {
+      if (cursorFrames[name]) return cursorFrames[name];
+      const info = manifest[name];
+      if (!info) return null;
+      const frames = [];
+      for (let i = 0; i < info.frames; i++) {
+        frames.push({ url: `/cursors/${name}/frame-${i}.png`, ms: info.frameMs[i] ?? 100 });
+      }
+      cursorFrames[name] = frames;
+      return frames;
+    }
+
+    // Animate cursor for a given element
+    const activeTimers = new WeakMap();
+
+    async function applyCursor(el, cursorName, hotspotX = 0, hotspotY = 0) {
+      const frames = await loadFrames(cursorName);
+      if (!frames || frames.length === 0) return;
+
+      // Clear previous timer
+      if (activeTimers.has(el)) clearTimeout(activeTimers.get(el));
+
+      let idx = 0;
+      function tick() {
+        const f = frames[idx % frames.length];
+        el.style.cursor = `url('${f.url}') ${hotspotX} ${hotspotY}, auto`;
+        idx++;
+        activeTimers.set(el, setTimeout(tick, f.ms));
+      }
+      tick();
+    }
+
+    function resetCursor(el) {
+      if (activeTimers.has(el)) { clearTimeout(activeTimers.get(el)); activeTimers.delete(el); }
+      el.style.cursor = '';
+    }
+
+    // Hotspot hints (approximate for this cursor set)
+    const hotspots = {
+      NormalSelect:      [0, 0],
+      LinkSelect:        [8, 2],
+      Busy:              [16, 16],
+      WorkingInBackground:[0, 0],
+      TextSelect:        [4, 8],
+      Move:              [16, 16],
+      PrecisionSelect:   [16, 16],
+      Unavailable:       [16, 16],
+      HelpSelect:        [0, 0],
+      HorizontalResize:  [16, 8],
+      VerticalResize:    [8, 16],
+      DiagonalResize1:   [16, 16],
+      DiagonalResize2:   [16, 16],
+    };
+
+    // Apply to document body and watch for pointer-type changes
+    const body = document.body;
+    applyCursor(body, 'NormalSelect', 0, 0);
+
+    // Override cursor on interactive elements
+    function patchElement(el) {
+      const computed = window.getComputedStyle(el).cursor;
+      for (const [cssCursor, alienName] of Object.entries(cursorMap)) {
+        if (computed === cssCursor) {
+          const hs = hotspots[alienName] ?? [0, 0];
+          el.addEventListener('mouseenter', () => applyCursor(body, alienName, hs[0], hs[1]));
+          el.addEventListener('mouseleave', () => applyCursor(body, 'NormalSelect', 0, 0));
+          break;
+        }
+      }
+    }
+
+    // Patch buttons, links, inputs on hover dynamically
+    document.addEventListener('mouseover', (e) => {
+      const el = e.target;
+      const tag = el.tagName;
+      if (tag === 'BUTTON' || tag === 'A' || el.onclick) {
+        const hs = hotspots['LinkSelect'] ?? [8, 2];
+        applyCursor(body, 'LinkSelect', hs[0], hs[1]);
+      } else if (tag === 'INPUT' || tag === 'TEXTAREA') {
+        applyCursor(body, 'TextSelect', 4, 8);
+      }
+    });
+    document.addEventListener('mouseout', (e) => {
+      const to = e.relatedTarget;
+      if (!to || to === document.body) {
+        applyCursor(body, 'NormalSelect', 0, 0);
+      }
+    });
+
+  } catch(e) { /* silent — cursors are cosmetic */ }
+})();
 </script>
 </body>
 </html>

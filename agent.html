@@ -519,6 +519,7 @@ function startSessionPoll() {
       // If WRAP_UP, show modal (and hydrate currentCallId from server if needed)
       if (state === 'WRAP_UP') {
         stopHoldTone();
+        if (hasBeeped) { playDisconnectTone(); hasBeeped = false; }
         if (!currentCallId) {
           await fetchCurrentCall();
         }
@@ -574,7 +575,7 @@ async function fetchCurrentCall() {
   }
 }
 
-// ── BRIDGE BEEP ──────────────────────────────────────────
+// ── AUDIO CUES ───────────────────────────────────────────
 function playBridgeBeep() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -588,11 +589,28 @@ function playBridgeBeep() {
     osc.onended = () => ctx.close();
   } catch(e) {}
 }
+function playDisconnectTone() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const gain = ctx.createGain();
+    gain.connect(ctx.destination);
+    [440, 330].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      osc.connect(gain);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.18);
+      gain.gain.setValueAtTime(0.35, ctx.currentTime + i * 0.18);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.18 + 0.15);
+      osc.start(ctx.currentTime + i * 0.18);
+      osc.stop(ctx.currentTime + i * 0.18 + 0.15);
+      if (i === 1) osc.onended = () => ctx.close();
+    });
+  } catch(e) {}
+}
 
 // ── CALL TIMER ───────────────────────────────────────────
 function startCallTimer() {
   stopCallTimer();
-  playBridgeBeep();
   callTimerInterval = setInterval(() => {
     const secs = Math.floor((Date.now() - callStartTime.getTime()) / 1000);
     const m = String(Math.floor(secs / 60)).padStart(2,'0');

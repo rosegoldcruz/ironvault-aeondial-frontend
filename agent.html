@@ -76,6 +76,21 @@
   #ready-btn.go-pause:hover{filter:brightness(1.1)}
   #ready-btn:disabled{opacity:.4;cursor:not-allowed}
 
+  /* MANUAL DIAL */
+  #manual-dial-panel{margin-top:12px;display:flex;gap:8px;align-items:center}
+  #manual-dial-input{
+    flex:1;padding:10px 12px;background:var(--surface);border:1px solid #333;
+    color:var(--text);border-radius:6px;font-size:14px;font-family:'IBM Plex Mono',monospace;
+  }
+  #manual-dial-input:focus{outline:none;border-color:var(--cyan)}
+  #manual-dial-btn{
+    padding:10px 16px;background:var(--cyan);color:#000;font-size:13px;font-weight:700;
+    border:none;cursor:pointer;border-radius:6px;letter-spacing:1px;white-space:nowrap;
+    transition:filter .15s;
+  }
+  #manual-dial-btn:hover{filter:brightness(1.1)}
+  #manual-dial-btn:disabled{opacity:.4;cursor:not-allowed}
+
   /* LIVE CALL CARD */
   #call-card{display:none}
   .lead-name{font-size:26px;font-weight:600;margin-bottom:4px}
@@ -172,6 +187,10 @@
       </div>
     </div>
     <button id="ready-btn" class="go-ready" onclick="toggleReady()" disabled>GO READY</button>
+    <div id="manual-dial-panel">
+      <input id="manual-dial-input" type="tel" placeholder="Manual dial: 480-364-8205" />
+      <button id="manual-dial-btn" onclick="manualDial()" disabled>DIAL</button>
+    </div>
   </div>
 
   <!-- Live Call Card -->
@@ -413,6 +432,7 @@ async function initWebRTC() {
         await apiFetch('/session/register', 'POST');
         updateState('REGISTERED', 'Click GO READY to start receiving calls');
         document.getElementById('ready-btn').disabled = false;
+        document.getElementById('manual-dial-btn').disabled = false;
       })
       .on('telnyx.error', (err) => {
         console.warn('[WebRTC] Non-fatal error:', err);
@@ -458,7 +478,8 @@ async function initWebRTC() {
         if (call.state === 'active') {
           console.log('[WebRTC] Call active - bridged');
           stopHoldTone();
-          updateState('IN_CALL', 'Live call in progress');
+          document.getElementById('call-card').style.display = 'block';
+          document.getElementById('manual-dial-btn').disabled = true;
           await fetchCurrentCall();
           return;
         }
@@ -467,6 +488,7 @@ async function initWebRTC() {
           activeTelnyxCall = null;
           stopHoldTone();
           beepedCallId = null;
+          document.getElementById('manual-dial-btn').disabled = false;
           console.log('[WebRTC] Call ended');
         }
       });
@@ -538,6 +560,29 @@ function startSessionPoll() {
       }
     } catch(e) { /* silent */ }
   }, 500);
+}
+
+async function manualDial() {
+  const input = document.getElementById('manual-dial-input');
+  const btn = document.getElementById('manual-dial-btn');
+  const phone = input.value.trim();
+  if (!phone) return;
+  btn.disabled = true;
+  btn.textContent = 'DIALING...';
+  try {
+    const res = await apiFetch('/calls/manual-dial', 'POST', { phone });
+    if (!res.ok) {
+      const err = await res.json();
+      alert('Dial failed: ' + (err.error ?? 'Unknown error'));
+    } else {
+      input.value = '';
+    }
+  } catch(e) {
+    alert('Dial error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'DIAL';
+  }
 }
 
 async function fetchCurrentCall() {

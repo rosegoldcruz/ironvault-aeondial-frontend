@@ -240,7 +240,7 @@ let calSelectedDate = null; // Date object for selected calendar day
 let calViewYear = null;
 let calViewMonth = null; // 0-indexed
 let calCallbackISO = null; // final ISO string set on confirm
-let hasBeeped = false;
+let beepedCallId = null;
 
 // ── CALENDAR ────────────────────────────────────────────────
 function openCalModal() {
@@ -459,7 +459,7 @@ async function initWebRTC() {
         if (['hangup', 'destroy', 'purge'].includes(call.state)) {
           activeTelnyxCall = null;
           stopHoldTone();
-          hasBeeped = false;
+          beepedCallId = null;
           console.log('[WebRTC] Call ended');
         }
       });
@@ -519,7 +519,7 @@ function startSessionPoll() {
       // If WRAP_UP, show modal (and hydrate currentCallId from server if needed)
       if (state === 'WRAP_UP') {
         stopHoldTone();
-        if (hasBeeped) { playDisconnectTone(); hasBeeped = false; }
+        if (beepedCallId) { playDisconnectTone(); beepedCallId = null; }
         if (!currentCallId) {
           await fetchCurrentCall();
         }
@@ -566,8 +566,8 @@ async function fetchCurrentCall() {
       callStartTime = new Date(call.answered_at ?? call.started_at);
       startCallTimer();
     }
-    if (call.status === 'bridged' && !hasBeeped) {
-      hasBeeped = true;
+    if (call.status === 'bridged' && beepedCallId !== call.id) {
+      beepedCallId = call.id;
       playBridgeBeep();
     }
   } catch (e) {

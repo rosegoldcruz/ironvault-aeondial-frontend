@@ -567,8 +567,9 @@ async function fetchCurrentCall() {
       startCallTimer();
     }
     if (call.status === 'bridged' && beepedCallId !== call.id) {
+      const bridgedMs = call.answered_at ? Date.now() - new Date(call.answered_at).getTime() : 99999;
       beepedCallId = call.id;
-      playBridgeBeep();
+      if (bridgedMs < 60000) playBridgeBeep();
     }
   } catch (e) {
     console.warn('fetchCurrentCall failed:', e);
